@@ -1,4 +1,4 @@
-
+*.exe
 # Created by https://www.gitignore.io/api/python,haskell,rust
 
 ### Python ###

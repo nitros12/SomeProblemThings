@@ -11,7 +11,8 @@ def triangle(n: int) -> int:
 
 def solution(x: int=1, y: int=1) -> int:
     """Calculate the solution to the problem"""
-    return triangle(x) // 2 + (y * y - y) // 2 + (2 * x - 2) * (y - 1) // 2
+    return triangle(x) + triangle(y - 1) + (x - 1) * (y - 1)
+    #return triangle(x) // 2 + (y * y - y) // 2 + (2 * x - 2) * (y - 1) // 2
 
 
 class Test(unittest.TestCase):
