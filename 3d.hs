@@ -1,15 +1,15 @@
 import           Data.Maybe                   (catMaybes, listToMaybe)
 import           System.Console.Terminal.Size
 
-data Coord = Coord Float Float deriving (Eq, Show)
+data Coord = Coord Int Int deriving (Eq, Show)
+data Vec2d = Vec2d Float Float deriving (Eq, Show)
 data Vec3d = Vec3d Float Float Float deriving (Eq, Show)
-data Tri2d = Tri2d Coord Coord Coord
+data Tri2d = Tri2d Vec2d Vec2d Vec2d
 data Tri = Tri Vec3d Vec3d Vec3d
 data Transform = Transform Vec3d Vec3d -- translation, camera rotation
 
 type Mesh = [Tri]
 type FlatMesh = [Tri2d]
-type Zbuffer = [[(Char, Integer)]]
 
 add :: Vec3d -> Vec3d -> Vec3d
 (Vec3d a b c) `add` (Vec3d d e f) = Vec3d (a+d) (b+e) (c+f)
@@ -49,42 +49,41 @@ rotateMesh vec = map (`rotateTri` vec)
 transformMesh :: Vec3d -> Vec3d -> Mesh -> Mesh
 transformMesh tran rot = rotateMesh rot . translateMesh tran
 
-project :: Vec3d -> Coord
-project (Vec3d x y z) = Coord (x/z) (y/z)
+project :: Vec3d -> Vec2d
+project (Vec3d x y z) = Vec2d (x/z) (y/z)
 
-projectTri :: Tri -> Tri2d
 projectTri (Tri a b c) = Tri2d (project a) (project b) (project c)
+projectTri :: Tri -> Tri2d
 
 depth :: Vec3d -> Float
 depth (Vec3d _ _ z) = z
 
-depthTri :: Tri -> Coord -> Float
+depthTri :: Tri -> Vec2d -> Float
 depthTri (Tri
   (Vec3d ax ay az)
   (Vec3d bx by bz)
-  (Vec3d cx cy cz)) (Coord x y) =
-    (na / nb) * nc - (nd / ne) * nf
+  (Vec3d cx cy cz)) (Vec2d x y) =
+    (na / nb) * nc - (nd / nb) * ne
       where na = (bx - ax)*(cz - az) - (cx - ax)*(bz - az)
             nb = (bx - ax)*(cy - ay) - (cx - ax)*(by - ay)
             nc = y - ay
             nd = (by - ay)*(cz - az) - (cy - ay)*(bz - az)
-            ne = (bx - ax)*(cy - ay) - (cx - ax)*(by - ay)
-            nf = x - ax
+            ne = x - ax
 
-triSign :: Coord -> Coord -> Coord -> Float -- determine if a point is inside projected triangle
-triSign (Coord a b) (Coord c d) (Coord e f) = (a - e) * (d - f) - (c - e) * (b - f)
+triSign :: Vec2d -> Vec2d -> Vec2d -> Float -- determine if a point is inside projected triangle
+triSign (Vec2d a b) (Vec2d c d) (Vec2d e f) = (a - e) * (d - f) - (c - e) * (b - f)
 
 triSignBool :: Tri2d -> Bool
 triSignBool (Tri2d a b c) = triSign a b c < 0.0
 
-coordInTri :: Tri2d -> Coord -> Bool
-coordInTri (Tri2d a b c) pt = (b1 == b2) && (b2 == b3)
+vec2dInTri :: Tri2d -> Vec2d -> Bool
+vec2dInTri (Tri2d a b c) pt = (b1 == b2) && (b2 == b3)
   where b1 = triSign pt a b
         b2 = triSign pt b c
         b3 = triSign pt c a
 
-coordIn3dTri :: Tri -> Coord -> Bool
-coordIn3dTri tri = coordInTri (projectTri tri)
+vec2dIn3dTri :: Tri -> Vec2d -> Bool
+vec2dIn3dTri tri = vec2dInTri (projectTri tri)
 
 clamp :: (Ord a, Num a) => a -> a -> a -> a
 clamp i l m
@@ -99,8 +98,16 @@ zToChar z = "0XZVMYOAT8. "!!clamp (round z) 0 11
 flattenMesh :: Mesh -> FlatMesh
 flattenMesh = map projectTri
 
-getTriDept :: Tri -> Coord -> Coord -> [[Float]]
-getTriDept tri (Coord l b) (Coord r t) = [[depthTri tri (Coord x y) | x <- [l..r]] | y <- [b..t]]
+triDepthHelper :: Tri -> Vec2d -> Float
+triDepthHelper tri vec
+  | vec2dIn3dTri tri vec = depthTri tri vec
+  | otherwise = 100 -- make this be behind camera
+
+mapTriDepth :: Tri -> Coord -> Coord -> [[Float]]
+mapTriDepth tri (Coord l b) (Coord r t) = [[depthTri tri (Vec2d (fromIntegral x) (fromIntegral y)) | x <- [l..r]] | y <- [b..t]]
+
+mergebuffer :: [[Float]] -> [[Float]] -> [[Float]]
+mergebuffer = zipWith (zipWith min)
 
 rasterise :: [[Float]] -> [String]
 rasterise = map rasterline
