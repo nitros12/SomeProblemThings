@@ -4,8 +4,8 @@ import           System.Console.Terminal.Size
 data Coord = Coord Int Int deriving (Eq, Show)
 data Vec2d = Vec2d Float Float deriving (Eq, Show)
 data Vec3d = Vec3d Float Float Float deriving (Eq, Show)
-data Tri2d = Tri2d Vec2d Vec2d Vec2d
-data Tri = Tri Vec3d Vec3d Vec3d
+data Tri2d = Tri2d Vec2d Vec2d Vec2d deriving (Eq, Show)
+data Tri = Tri Vec3d Vec3d Vec3d deriving (Eq, Show)
 data Transform = Transform Vec3d Vec3d -- translation, camera rotation
 
 type Mesh = [Tri]
@@ -52,8 +52,8 @@ transformMesh tran rot = rotateMesh rot . translateMesh tran
 project :: Vec3d -> Vec2d
 project (Vec3d x y z) = Vec2d (x/z) (y/z)
 
-projectTri (Tri a b c) = Tri2d (project a) (project b) (project c)
 projectTri :: Tri -> Tri2d
+projectTri (Tri a b c) = Tri2d (project a) (project b) (project c)
 
 depth :: Vec3d -> Float
 depth (Vec3d _ _ z) = z
@@ -73,14 +73,14 @@ depthTri (Tri
 triSign :: Vec2d -> Vec2d -> Vec2d -> Float -- determine if a point is inside projected triangle
 triSign (Vec2d a b) (Vec2d c d) (Vec2d e f) = (a - e) * (d - f) - (c - e) * (b - f)
 
-triSignBool :: Tri2d -> Bool
-triSignBool (Tri2d a b c) = triSign a b c < 0.0
+triSignBool :: Vec2d -> Vec2d -> Vec2d -> Bool
+triSignBool a b c = triSign a b c < 0
 
 vec2dInTri :: Tri2d -> Vec2d -> Bool
 vec2dInTri (Tri2d a b c) pt = (b1 == b2) && (b2 == b3)
-  where b1 = triSign pt a b
-        b2 = triSign pt b c
-        b3 = triSign pt c a
+  where b1 = triSignBool pt a b
+        b2 = triSignBool pt b c
+        b3 = triSignBool pt c a
 
 vec2dIn3dTri :: Tri -> Vec2d -> Bool
 vec2dIn3dTri tri = vec2dInTri (projectTri tri)
