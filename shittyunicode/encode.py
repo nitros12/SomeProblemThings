@@ -18,8 +18,8 @@ def pack_unicode(bits: [int]) -> [[int]]:
         yield group
 
 
-def encode_unicode(bits: [[int]]) -> [int]:
-    for i in packs:
+def concat_bytes(bits: [[int]]) -> [int]:
+    for i in bits:
         num = 0
         for n, c in enumerate(i):
             num += c << (n * 8)
