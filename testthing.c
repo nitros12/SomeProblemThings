@@ -60,10 +60,9 @@ int read_employee_data(FILE *inf, data **employees) {
       fprintf(stderr, "failed to allocate memory.\n");
       exit(1);
     }
-    memset(&(*employees)[read - 1], 0, sizeof(data)); // zero out
     // again, save a temporary pointer for cleaner code
     tmp = &(*employees)[read - 1];
-
+    memset(tmp, 0, sizeof(data)); // zero out
     fscanf(inf, "%d %s %s %d %f\n", &tmp->empID, tmp->first_name,
            tmp->last_name, &tmp->department, &tmp->salary);
   }
