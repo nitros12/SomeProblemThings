@@ -73,7 +73,7 @@ void translateRotate(vec3d *set, vec3d *rot, vec3d *tran) {
   rotateVec(set, rot);
 }
 
-void rotateTri(tri *set, vec3d *rot) {
+void rotateTri(tri *restrict set, vec3d *restrict rot) {
   rotateVec(&set->a, rot);
   rotateVec(&set->b, rot);
   rotateVec(&set->c, rot);
@@ -106,13 +106,13 @@ vec2d projectVec(vec3d *a) {
   return flat;
 }
 
-void projectTri(tri *source, tri2d *setter) {
+void projectTri(tri *restrict source, tri2d *restrict setter) {
   setter->a = projectVec(&source->a);
   setter->b = projectVec(&source->b);
   setter->c = projectVec(&source->c);
 }
 
-bool vecInTri(tri2d *source, vec2d *chk) {
+bool vecInTri(tri2d *restrict source, vec2d *restrict chk) {
   bool b1, b2, b3;
   b1 = trisignbool(chk, &source->a, &source->b);
   b2 = trisignbool(chk, &source->b, &source->c);
@@ -120,15 +120,15 @@ bool vecInTri(tri2d *source, vec2d *chk) {
   return (b1 == b2) && (b2 == b3);
 }
 
-void drawScreen(depthPixel ***buffer, char *writeBuffer) {
+void drawScreen(depthPixel *restrict buffer) {
+  printf("\033[2J");
   register int x;
   for (register int y = 0; y < height; ++y) {
     for (x = 0; x < width; ++x) {
-      writeBuffer[(width+1)*y+x] = buffer[y][x]->pix;
+      putchar(buffer[y * width + x].pix);
     }
-    writeBuffer[(width+1)*y+x] = '\n';
+    putchar('\n');
   }
-  printf(writeBuffer);
 }
 
 int limit(int val, int min, int max) {
@@ -141,16 +141,14 @@ char getPix(double depth) {
   return "1234567890abcdefg"[limit(round(depth), 0, 16)];
 }
 
-void wipeBuffer(depthPixel ***pixels) {
-  for (register int y=0; y < height; ++y) {
-    for (register int x=0; x < width; ++x) {
-      pixels[y][x]->pix = '-';
-      pixels[y][x]->depth = 1000.0;
-    }
+void wipeBuffer(depthPixel *restrict pixels) {
+  for (register int i; i < height*width; i++) {
+    pixels[i].pix = ' ';
+    pixels[i].depth = 1000.0;
   }
 }
 
-void rasterTri(tri *source, depthPixel ***buffer) {
+void rasterTri(tri *source, depthPixel *restrict buffer) {
   tri2d mapped;
   projectTri(source, &mapped);
 
@@ -161,9 +159,9 @@ void rasterTri(tri *source, depthPixel ***buffer) {
       temp.x = (double) x;
       if (vecInTri(&mapped, &temp)) {
         double depth = depthTri(source, x, y);
-        if (buffer[y][x]->depth > depth) {
-          buffer[y][x]->depth = depth;
-          buffer[y][x]->pix = getPix(depth);
+        if (buffer[y * width + x].depth > depth) {
+          buffer[y * width + x].depth = depth;
+          buffer[y * width + x].pix = getPix(depth);
         }
       }
     }
@@ -175,20 +173,8 @@ int render() {
   printf("reported width: %d, reported height: %d", width, height);
   setbuf(stdout, NULL);
 
-  depthPixel ***pixels = (depthPixel ***) calloc(height, sizeof(depthPixel *));
+  depthPixel *pixels = (depthPixel *) calloc(height*width, sizeof(depthPixel));
   if (!pixels) return EXIT_FAILURE;
-
-  for (int y=0; y < height; ++y) {
-    pixels[y] = (depthPixel **) calloc(width, sizeof(depthPixel *));
-    if (!pixels[y]) return EXIT_FAILURE;
-    // we'll never bother to free this since it'll only fall out of use when the program ends and the OS deallocs it for us
-    for (int x=0; x < width; ++x) {
-      pixels[y][x] = (depthPixel *) malloc(sizeof(depthPixel));
-      if (!pixels[y][x]) return EXIT_FAILURE;
-    }
-  }
-
-  char *writeBuffer = (char *) calloc((width+1) * height, sizeof(char));
 
   tri testrender;
   testrender.a = (vec3d) {0.0, 0.0, 20.0};
@@ -198,13 +184,13 @@ int render() {
 
   vec3d rotation;
 
-  for (register int i=0; i<1000; i++) {
+  for (uint64_t i=0; i<999999; i++) {
     tri copyTri = testrender;
     rotateTri(&copyTri, &rotation);
     rotation.z += PI_DIV_10;
     wipeBuffer(pixels); // always wipe first
     rasterTri(&copyTri, pixels);
-    drawScreen(pixels, writeBuffer);
+    drawScreen(pixels);
   }
 
   return EXIT_SUCCESS;
