@@ -17,13 +17,13 @@ const char *piecenames[] = {
 
 // index: [assoc, presedence]
 const int opassoc[7][2] = {
-    {0, 0},
-    {0, 0},
-    {true, 0},
-    {true, 0},
+    {false, 0},
+    {false, 0},
     {true, 1},
     {true, 1},
-    {0, 0}
+    {true, 2},
+    {true, 2},
+    {false, 0}
 };
 
 const char ops[] = "()+-*/ ";
@@ -52,14 +52,14 @@ void append(node *head, types type, int val) {
     while (head->next) {
         head = head->next;
     }
-    head->next = (node *) malloc(sizeof(node));
+    head->next =  malloc(sizeof(node));
     head->next->type = type;
     head->next->val = val;
     head->next->next = NULL;
 }
 
 node *make_head(types type, int val) {
-    node *head = (node *) malloc(sizeof(node));
+    node *head =  malloc(sizeof(node));
     head->type = type;
     head->val = val;
     head->next = NULL;
@@ -67,62 +67,58 @@ node *make_head(types type, int val) {
 }
 
 node *lex(char *s) {
-    node *head = make_head(-1, 0);
+    node head = {0};
 
     while (*s) {
         switch (*s) {
             case '+':
-                append(head, add, 0);
+                append(&head, add, 0);
                 break;
             case '-':
-                append(head, sub, 0);
+                append(&head, sub, 0);
                 break;
             case '*':
-                append(head, mul, 0);
+                append(&head, mul, 0);
                 break;
             case '/':
-                append(head, DIV, 0);
+                append(&head, DIV, 0);
                 break;
             case '0' ... '9':
                 {
                     char *end;
                     int v = strtol(s, &end, 10);
-                    append(head, num, v);
+                    append(&head, num, v);
                     s = --end; // realloc, use the consumed string
                     break;
                 }
             case '(':
-                append(head, lparen, 0);
+                append(&head, lparen, 0);
                 break;
             case ')':
-                append(head, rparen, 0);
-                break;
-            default:
+                append(&head, rparen, 0);
                 break;
         }
         s++;
     }
 
-    node *ret = head->next;
-    free(head);
-    return ret;
+    return head.next;
 }
 
 void printnode(node *head) {
-    do {
+    while (head != NULL) {
         printf("<type %s> <val %d>\n", piecenames[head->type], head->val);
         head = head->next;
-    } while (head->next != NULL);
+    }
 }
 
 void printOps(node *head) {
-    do {
+    while (head != NULL) {
         if (head->type == num)
             printf(" %d ", head->val);
         else
             printf("%c", ops[head->type]);
         head = head->next;
-    } while (head->next != NULL);
+    }
     printf("\n");
 }
 
@@ -146,11 +142,23 @@ node *pop(node **head) {
     return temp;
 }
 
+void reverse(node **mhead) {
+  node *head = *mhead;
+  node *temp, *last=NULL;
+  while (head != NULL) {
+    temp = head->next;
+    head->next = last;
+    last = head;
+    head = temp;
+  }
+  *mhead = last;
+}
+
 
 node *shunting_yard(node *head) {
     node *op_stack = NULL;
-    node *output;
-    node *op;
+    node *output = NULL;
+    node *op = NULL;
 
     while (head != NULL) {
         op = pop(&head);
@@ -181,9 +189,11 @@ node *shunting_yard(node *head) {
             case rparen:
                 while (op_stack->type != lparen)
                     push(&output, pop(&op_stack));
-                pop(&op_stack); // remove paren
+                free(pop(&op_stack)); // remove paren, also freeing it
+                free(op);
                 break;
             default:
+                free(op); // free since we're not using it
                 break;
         }
     }
@@ -200,21 +210,71 @@ node *shunting_yard(node *head) {
                 break;
         }
     }
-    //freenode(op_stack);
-    //freenode(op_stack);
-    //freenode(op);
+    reverse(&output);
     return output;
 }
 
-int main() {
 
-    char *string = "4+3-5*(343/212)";
+int list_length(node *head) {
+  int c=0;
+  while (head != NULL) {
+    if (head->type == num) c++;
+    head = head->next;
+  }
+  return c;
+}
+
+
+int calculate(node *head) {
+
+  int max = list_length(head);
+  int stack[max];
+  int pos=0;
+  int l,r;
+
+  while (head != NULL) {
+    switch (head->type) {
+      case num:
+        stack[pos++] = head->val;
+        break;
+      case add:
+        l = stack[--pos];
+        r = stack[--pos];
+        stack[pos++] = r + l;
+        break;
+      case sub:
+        l = stack[--pos];
+        r = stack[--pos];
+        stack[pos++] = r - l;
+        break;
+      case mul:
+        l = stack[--pos];
+        r = stack[--pos];
+        stack[pos++] = r * l;
+        break;
+      case DIV:
+        l = stack[--pos];
+        r = stack[--pos];
+        stack[pos++] = r / l;
+        break;
+      default:
+        break;
+    }
+    head = head->next;
+  }
+  return stack[--pos];
+}
+
+int main(int argc, char **argv) {
+
+    if (argc < 2) {
+      printf("Usage: %s <expression>", *argv);
+      return 0;
+    }
+
+    char *string = argv[1];
     node *parsed = lex(string);
-    printnode(parsed);
     node *shunted = shunting_yard(parsed);
-    printf("\n");
-    printnode(shunted);
-    printOps(shunted);
-    //freenode(shunted);
-    //freenode(parsed);
+    printf("%s = %d\n", string, calculate(shunted));
+    freenode(shunted);
 }
