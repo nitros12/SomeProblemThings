@@ -1,4 +1,80 @@
 class Node:
+
+    def __init__(self, left=None, right=None, weight: int=None, value: str=""):
+        self.left = left
+        self.right = right
+
+        self._weight = weight
+        self.value = value
+
+    @property
+    def terminating(self) -> bool:
+        return None in (self.left, self.right)
+
+    @property
+    def depth(self) -> int:
+        l = self.left.depth + 1 if self.left else 0
+        r = self.right.depth + 1 if self.right else 0
+        return max((l, r))
+
+    @property
+    def weight(self) -> int:
+        if self.terminating:
+            return self.weight
+        return self.left.weight + self.right.weight
+
+    def __getitem__(self, key):
+        v, key = key[0], key[1:]
+        lr = {"0": self.right, "1": self.left}
+
+        if not key:
+            return lr[v].value
+
+        return lr[v][key]
+
+    def find(self, value, prev=""):
+        if self.value == value:
+            return prev
+
+        elif self.terminating:
+            return None
+
+        if self.right is not None:
+            r = self.right.find(value, prev + "0")
+            if r is not None:
+                return r
+
+        if self.left is not None:
+            l = self.left.find(value, prev + "1")
+            if l is not None:
+                return l
+
+    def __iter__(self):
+        yield (self, self.depth)
+        for i in (self.left, self.right):
+            if i:
+                yield from i
+            else:
+                yield (None, self.depth)
+
+    def __str__(self):
+        depth = self.depth
+        width = 2 ** depth
+        tree = [[]] * (depth + 1)
+
+        def formatter(nodes):
+            spacer = " " * ((width - 2) // len(nodes))
+            return spacer.join(nodes)
+
+        for i, d in self:
+            tree[d].append(i.value if i else " ")
+
+        print(tree)
+
+        return "\n".join(map(formatter, tree))
+
+
+class Node0:
     """Node with left/ right children"""
 
     def __init__(self, left=None, right=None, weight: int=0, content: str=""):
